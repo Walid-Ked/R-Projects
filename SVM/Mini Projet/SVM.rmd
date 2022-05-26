@@ -1,0 +1,314 @@
+---
+title: "SVM Mini_Projet"
+author: "Walid Keddad"
+output: pdf_document
+---
+
+##SVM Lineaire:
+
+Genereation du jeux de données : 
+
+```{r}
+n <- 150 # number of data points
+p <- 2 # dimension
+sigma <- 1 # variance of the distribution
+meanpos <- 0 # centre of the distribution of positive examples
+meanneg <- 3 # centre of the distribution of negative examples
+npos <- round(n/2) # number of positive examples
+nneg <- n-npos # number of negative examples
+# Generate the positive and negative examples
+xpos <- matrix(rnorm(npos*p,mean=meanpos,sd=sigma),npos,p)
+xneg <- matrix(rnorm(nneg*p,mean=meanneg,sd=sigma),npos,p)
+x <- rbind(xpos,xneg)
+# Generate the labels
+y <- matrix(c(rep(1,npos),rep(-1,nneg)))
+# Visualize the data
+plot(x,col=ifelse(y>0,1,2))
+legend("topleft",c('Positive','Negative'),col=seq(2),pch=1,text.col=seq(2))
+```
+
+Maintenant, nous divisons les données en un ensemble d'entraînement (80%) et un ensemble de tests (20%)
+
+
+```{r}
+## Prepare a training and a test set ##
+ntrain <- round(n*0.8) # number of training examples
+tindex <- sample(n,ntrain) # indices of training samples
+xtrain <- x[tindex,]
+xtest <- x[-tindex,]
+ytrain <- y[tindex]
+ytest <- y[-tindex]
+istrain=rep(0,n)
+istrain[tindex]=1
+# Visualize
+plot(x,col=ifelse(y>0,1,2),pch=ifelse(istrain==1,1,2))
+legend("topleft",c('Positive Train','Positive Test','Negative Train','Negative Test'),
+       col=c(1,1,2,2),pch=c(1,2,1,2),text.col=c(1,1,2,2))
+```
+
+###Entrainer le SVM
+
+Maintenant nous formons un SVM linéaire avec le paramètre C = 100 sur l'ensemble d'entraînement.
+
+```{r}
+# load the kernlab package
+library(kernlab)
+# train the SVM
+svp <- ksvm(xtrain,ytrain,type="C-svc",kernel='vanilladot',C=100,scaled=c())
+# Look and understand what svp contains
+# General summary
+svp
+# Attributes that you can access
+attributes(svp)
+# For example, the support vectors
+alpha(svp)
+alphaindex(svp)
+b(svp)
+# Use the built-in function to pretty-plot the classifier
+plot(svp,data=xtrain)
+```
+
+###Question 1 : 
+
+```{r}
+plotlinearsvm <- function(svp, xtrain){
+  plot(xtrain, col = ifelse(ytrain > 0, 4, 11) , pch=19)
+  legend("topleft", c("Positive", "Negative"), col = c(4,11) , pch =19 , text.col = c(4,11))
+  intercept = b(svp)
+  
+  slope = colSums(unlist(alpha(svp)) * ytrain[unlist(alphaindex(svp))]*xtrain[unlist(alphaindex(svp)),])
+  abline(a= intercept / slope[2], b = -slope[1]/slope[2] , col = 2 , lwd = 2)
+  abline(a= (intercept+1)/ slope[2], b = -slope[1]/slope[2], lty = 3 , lwd = 2)
+  abline(a= (intercept-1)/ slope[2], b = -slope[1]/slope[2], lty = 3 , lwd = 2)
+}
+plotlinearsvm(svp, xtrain)
+
+```
+
+###Prédire : 
+
+Maintenant, nous pouvons utiliser le SVM entraîné pour prédire l'étiquette des points dans le jeu de test, et nous
+analysons les résultats en utilisant plusieurs variantes de métriques.
+
+```{r}
+# Predict labels on test
+ypred = predict(svp,xtest)
+table(ytest,ypred)
+# Compute accuracy
+sum(ypred==ytest)/length(ytest)
+# Compute at the prediction scores
+ypredscore = predict(svp,xtest,type="decision")
+# Check that the predicted labels are the signs of the scores
+table(ypredscore > 0,ypred)
+# Package to compute ROC curve, precision-recall etc...
+library(ROCR)
+pred <- prediction(ypredscore,ytest)
+# Plot ROC curve
+perf <- performance(pred, measure = "tpr", x.measure = "fpr")
+plot(perf)
+# Plot precision/recall curve
+perf <- performance(pred, measure = "prec", x.measure = "rec")
+plot(perf)
+# Plot accuracy as function of threshold
+perf <- performance(pred, measure = "acc")
+plot(perf)
+```
+
+###Cross_Validation
+
+Au lieu de fixer un ensemble d'apprentissage et un ensemble de tests, nous pouvons améliorer la qualité de ces
+estimations en exécutant k-fold cross-validation. Nous divisons l'ensemble d'entraînement en k groupes d'environ la
+même taille, puis itérativement former un SVM en utilisant k-1 groupes et faire de la prédiction sur le groupe qui a été
+laissé de côté. Lorsque k est égal au nombre de points de formation, on parle de leave-one-out (LOO) cross-validation.
+Pour générer une partition aléatoire de n points dans k plis (fold), nous pouvons par exemple créer la fonction suivante :
+
+```{r}
+cv.folds <- function(n,folds=3)
+  ## randomly split the n samples into folds
+{
+  split(sample(n),rep(1:folds,length=length(y)))
+}
+```
+
+###Question 3 :
+
+```{r}
+svp <- ksvm(x,y,type="C-svc",kernel='vanilladot',C=1,scaled=c(),cross=5)
+print(cross(svp))
+```
+
+###Question 5 : 
+```{r}
+cost = 2^(seq(-10, 14, by=5))
+for (c in cost){
+  svp = ksvm(xtrain, ytrain, type = "C-svc", kernel = "vanilladot", C=c, scaled=c())
+  plotlinearsvm(svp, xtrain)
+}
+```
+
+###Question 6 : 
+```{r}
+error = sapply(cost, function(c){
+  svm = ksvm(x, y, type = "C-svc", kernel = "vanilladot", C = c, scaled=c(), cross = 5)
+  cross(svm)
+})
+plot(cost, error, type='b')
+```
+
+
+#SVM Non Lineaire :
+
+###Question 8 : 
+
+**Generation aléatoire :**
+
+```{r}
+p = 2 
+n = 150
+mat1 <- matrix( rnorm(n*p , mean = 0), n, p)
+mat2 <- matrix( rnorm(n*p , mean = 3), n, p)
+mat3 <- matrix( rnorm(n*p , mean = 0), n, p)
+mat4 <- matrix( rnorm(n*p , mean = 3), n, p)
+mat5 <- cbind( mat3[,1], mat4[,2] )
+mat6 <- cbind( mat4[,1], mat3[,2] )
+y <- c( rep( 1, 2 * n ), rep( -1, 2 * n ) )
+xtrain <- sample( 300 , 200 )
+train <- rep( 0, 300 )
+train[xtrain] <- 1
+data =data.frame( x=rbind( mat1, mat2, mat5, mat6 ), y=y, train=train )
+plot(data[,1:2], col = ifelse(data[,3]<0,4,11) , pch=19 )
+x = as.matrix(data[,1:2])
+y = matrix(data[,3])
+
+```
+
+**Entrainer un SVM**
+
+```{r}
+svp <- ksvm(x,y,type="C-svc",kernel='rbf',kpar=list(sigma=1),C=0.5)
+plot(svp,data=x)
+```
+
+
+###Question 10 : 
+
+Construire un SVM non linéaire avec différents C avec détermination automatique de ??.
+```{r}
+c = 2^(seq(-10, 14, by=2))
+error = sapply(1:length(c), function(i){
+  svp = ksvm(x, y, type = "C-svc", kernel = "rbf", C = c[i], cross = 5)
+  cross(svp)
+})
+plot(c, error, type="b")
+
+```
+
+
+###Question 11 : 
+
+Testons les kernel  **polynôme**, la **tangente hyperbolique**, le **Laplacien**, le **Bessel** et **l'ANOVA** sur les exemples de données.
+
+###POLYDOT
+
+```{r}
+svp =ksvm(x, y, type = "C-svc", kernel = "polydot", C = 1)
+plot(svp )
+```
+
+###LAPLACEDOT
+
+```{r}
+svp =ksvm(x, y, type = "C-svc", kernel = "laplacedot", C = 1)
+plot(svp )
+
+```
+
+###ANOVADOT
+
+```{r}
+svp =ksvm(x, y, type = "C-svc", kernel = "anovadot", C = 1)
+plot(svp )
+
+```
+
+###BESSELDOT
+
+```{r}
+svp =ksvm(x, y, type = "C-svc", kernel = "besseldot", C = 1)
+plot(svp )
+
+```
+
+
+
+#3- Application : le diagnostic du cancer à partir des données d'expression génique
+
+```{r}
+# Load the ALL dataset
+library(ALL)
+library(kernlab)
+data(ALL)
+# Inspect them
+?ALL
+show(ALL)
+print(summary(pData(ALL)))
+x <- t(exprs(ALL))
+y <- substr(ALL$BT,1,1)
+```
+
+
+###Question 12 : 
+
+Division des données en ensembles d'entrainement et test : 
+
+```{r}
+n = length(y)
+train_set <- n * 0.75
+train_set
+train_index <- sample(n, train_set)
+train_index
+xtrain <- x[train_index, ]
+xtest <- x[-train_index, ]
+ytrain <- y[train_index]
+ytrain
+ytest <- y[-train_index]
+ytest
+
+```
+
+Entrainer le model :
+
+```{r}
+svm = ksvm(xtrain, ytrain, type = "C-svc", kernel = "vanilladot", C = 10)
+```
+
+Prédiction et Accuracy:
+
+```{r}
+pred = predict(svm, xtest)
+pred
+table(pred , ytest)
+accuracy = mean(pred == ytest)
+accuracy
+```
+
+
+###Question 13 :
+
+Enfin, nous pouvons vouloir prédire le type et le stade des maladies. Nous sommes alors confrontés à un problème de classification multi-classe, puisque la variable à prédire peut prendre plus de deux valeurs 
+
+```{r}
+y <- ALL$BT
+print(y)
+```
+
+On utilise le type **kbb-svc** pour un SVM multi_classe :
+
+```{r}
+svm = ksvm(xtrain, ytrain, type = "kbb-svc", kernel = "rbf", C = 10)
+pred = predict(svm, xtest)
+table(pred , ytest)
+accuracy = mean(pred == ytest)
+accuracy
+```
+

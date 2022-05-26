@@ -1,0 +1,284 @@
+---
+title: "Analyse En Composantes Principales"
+author: "Walid Keddad"
+output: html_document
+---
+
+## Exercice 1 : Arrestations aux Etats-Unis
+
+Le fichier de données USarrests, accessible en R via la commande data ("USArrests"), contient des statistiques
+collectées en 1973 sur les taux d'arrestation pour 100000 habitants pour agression, meurtre ou viol dans chacun
+des n = 50 états des USA. Une quatrième variable indique le pourcentage de résidents dans des zones urbaines pour chaque état
+
+
+**Chargement des données :**
+
+```{r}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+data = USArrests
+head(data)
+dim(data)
+```
+
+Faisant une analyse descriptive des variables : 
+
+```{r}
+summary(data)
+```
+
+On va effectuer en premier temps une **ACP non normée** : 
+
+```{r}
+acp = prcomp(data,scale=FALSE)
+summary(acp)
+```
+
+on va utiliser la biblithéque **factoextra** pour voir le résultat de l'acp :
+
+```{r}
+library(factoextra)
+var <- get_pca_var(acp)
+var
+```
+
+
+###Interpretation des axes
+
+####Variables :
+```{r}
+var <- get_pca_var(acp)
+var
+var$contrib
+```
+
+La variable qui contribue le plus à la formation de l'axe 1 est : **Assault** 99.04%
+
+La variable qui contribue le plus à la formation de l'axe 2 est : **UrbanPop** 95.42%
+
+
+####Individues :
+```{r}
+ind = get_pca_ind(acp)
+ind
+ind$contrib
+```
+Les individus qui contribuent le plus à la formation de l'axe 1 sont : **North Carolina** et **Florida** 7%
+
+Les individus qui contribuent le plus à la formation de l'axe 2 sont : **North Carolina** 9% et **Mississippi , Verment** 7%
+
+
+**Une représention graphique donne le résultat suivant :**
+
+```{r}
+plot(acp)
+biplot(acp , xlabs = row.names(USArrests))
+plot(1:4,acp$sdev,ylab="Variances ",xlab="Composantes",type = "b")
+```
+
+
+On va maintenant effectuer une **ACP normée** :
+```{r}
+acp.n = prcomp(data,scale=TRUE)
+summary(acp.n)
+```
+
+**La représentation graphique de l'ACP normée donne le résultat suivant:**
+```{r}
+plot(acp.n)
+biplot(acp.n , xlabs = row.names(USArrests))
+plot(1:4,acp.n$sdev,ylab="Variances",xlab="Composantes",type = "b")
+```
+
+On constate qu'après la **normalisation** le **2ème** composant participe plus que dans la version non normée
+
+
+## Exercice 2 : Analyse textuelle d'un corpus d'emails
+
+
+Dans cette partie, il est proposé d'analyser un jeu de données textuelles dans le but de tenter de déterminer les caractéristiques de spams. Une telle analyse est classiquement basée sur la fréquence d'une sélection de mots dans un ensemble d'apprentissage constitué de courriels qui appartiennent à 2 catégories possibles : spam ou non-spam.
+Les données analysées dans ce TP sont publiques, et elles peuvent servir de "benchmark" pour la comparaison de méthodes d'apprentissage automatique (UCI Machine Learning Repository. Irvine, CA : University of California, School of Information and Computer Science. http://archive.ics.uci.edu/ml):
+Il a été constitué un ´échantillon de messages électroniques dans chacun desquels a été évalué le nombre d'occurrences d'une sélection de mots et caractères. Les variables considérées sont des ratios qui correspondent au nombre d'occurrences d'un mot spécifique sur le nombre total de mots, ou nombre d'occurrences d'un caractère sur le nombre de caractères du message. Il a également considéré trois variables prenant en compte la casse (majuscule / minuscule) des caractères et une dernière variable qualitative binaire indiquant le type de chaque message : spam ou Nsp.
+
+
+**Chargement des données : **
+```{r}
+setwd("C:/Users/W  7/Desktop/Master 2/AA2/TP2_ACP")
+spam <- read.csv("Data\\data_spam.csv",header=FALSE,sep=";")
+nom_spam <- read.csv("Data\\names_spam.csv",header=FALSE,sep=";")
+names(spam) <- sapply((1:nrow(nom_spam)),function(i) toString(nom_spam[i,1]))
+spam$y = as.factor(spam$y)
+
+head(spam)
+dim(spam)
+```
+
+
+L'analyse descriptive des variables donne le résultat suivant :
+
+```{r}
+data = spam[,1:57]
+head(summary(data))
+```
+
+On va utiliser la bibliothèque **FactoMineR** pour effectuer l'ACP :
+
+**Une ACP non normée :**
+
+```{r}
+library(FactoMineR)
+pca = PCA(data , scale.unit = F)
+head(summary(pca))
+```
+
+###Interpretation : 
+
+###Variables :
+```{r}
+df = as.data.frame(pca$var$contrib)
+head(df[order(df$Dim.1 , decreasing = T),])
+```
+
+La variable qui contribue le plus à la formation de l'axe 1 est : **capital_run_length_total** 97.3% , **capital_run_length_longest** 2.67%
+
+```{r}
+head(df[order(df$Dim.2 , decreasing = T),])
+```
+La variable qui contribue le plus à la formation de l'axe 2 est : **capital_run_length_longest** 96.5% , **capital_run_length_total** 2.68%
+
+
+###Individus : 
+```{r}
+df = as.data.frame(pca$ind$contrib)
+head(df[order(df$Dim.1 , decreasing = T),])
+```
+Les individus qui contribuent le plus à la formation de l'axe 1 sont : **1489** *13%* et **1754** *7.32%* et **905 , 680 , 676** 4% 
+
+```{r}
+df = as.data.frame(pca$ind$contrib)
+head(df[order(df$Dim.2 , decreasing = T),])
+```
+Les individus qui contribuent le plus à la formation de l'axe 2 sont : **1754** *50.37%* et **1489** *5%* 
+
+
+Une représentation graphique de **l'ACP non normée :**
+
+```{r echo=FALSE}
+plot(pca)
+```
+
+
+**Une ACP normée :**
+  
+```{r}
+acp.n = PCA(data,scale.unit =TRUE)
+summary(acp.n)
+```
+
+Une représentation graphique de **l'ACP normée :**
+
+```{r}
+plot(acp.n)
+```
+
+
+**Représentation graphique avec séparation des données : **
+```{r} 
+coord <- acp.n$ind$coord
+col = rep("blue",nrow(data))
+col[spam$y == 0] = "orange"
+plot(coord[,1:2],col=col , pch = 19)
+```
+
+**recodage en forme de facteurs : **
+
+```{r}
+make=factor(spam[,"word_freq_make"] > 0, c(TRUE, FALSE),labels=c("make", "Nmk"))
+table(make)
+
+CapLMq=cut(spam[,"capital_run_length_total"],breaks=quantile(spam[,"capital_run_length_total"], probs = seq(0, 1, 1/3)),
+labels = c("Mm1","Mm2","Mm3"),include.lowest = TRUE)
+table(CapLMq)
+
+table(make, CapLMq)
+
+data = cbind(as.numeric(make), as.numeric(CapLMq))
+names(data) = c("make","CapLMq")
+```
+
+Analayse descriptive :
+
+```{r}
+summary(data)
+
+acp = prcomp(data)
+
+summary(acp)
+plot(acp)
+biplot(acp)
+
+```
+
+
+## Générateur Aléatoire de visages
+
+```{r}
+
+setwd("C:\\Users\\W  7\\Desktop\\Master 2\\AA2\\TP2_ACP\\Images\\")
+n = 10;
+img = list()
+names = c('img1.dat','img2.dat','img3.dat','img4.dat','img5.dat','img6.dat','img7.dat','img8.dat','img9.dat','img10.dat')
+
+for (i in 1:n) {
+	aux = t(as.matrix(read.table(names[i],sep=",")))
+	img[[i]] = aux[,112:1]
+	}
+
+N1 = dim(img[[1]])[1]
+N2 = dim(img[[1]])[2]
+
+for (i in 1:n) {
+	image(img[[i]], col=gray(0:256/256) , xlab="", ylab="",axes=FALSE)
+	}
+
+```
+
+**Image moyenne :**
+```{r}
+
+# Image moyenne
+moy = matrix(0,N1,N2)
+
+for (i in 1:n) {
+	moy = moy + img[[i]]
+	}
+moy = moy/n
+
+image(moy, col=gray(0:256/256) , xlab="", ylab="",axes=FALSE)
+
+# Matrice de donnees
+X = matrix(0,n,N1*N2)
+for (i in 1:n) {
+	X[i,] = as.vector(img[[i]]-moy)
+}
+```
+
+##Géneration Aléatoire : 
+
+On multiplie la matrice des composantes principales par la transposé de la matrice de corrélation, on obtient une matrice qui represente les images à l'aide des 2 premieres composantes
+
+```{r}
+acp = prcomp(X)
+mat = acp$x[,1:10]%*%t(acp$rotation[,1:10])
+mat = scale(mat, center = -1*moy, scale=FALSE)
+for (i in 1:5){
+  img <- matrix((mat[i,]), 92, 112)
+  image(1:92, 1:112,img,col=gray((0:256)/256) , xlab = "" , ylab = "" , axes =F)
+}
+
+```
+
+
+
+
+
+
